@@ -165,7 +165,7 @@ class VncClient extends Events {
         })
 
         this._connection.on('data', async (data) => {
-
+            this._log('Data Received:')
             this._log(data.toString(), true, 5);
             this._socketBuffer.pushData(data);
 
@@ -234,8 +234,8 @@ class VncClient extends Events {
      * @private
      */
     _handleHandshake() {
-        // Handshake, negotiating protocol version
-        this._log('Received: ' + this._socketBuffer.toString(), true, 2);
+        // Handshake: 7.1.1. ProtocolVersion Handshake
+        this._log('Received: ' + this._socketBuffer.toString(), true, 0);
         this._log(this._socketBuffer.buffer, true, 3);
         if (this._socketBuffer.toString() === versionString.V3_003) {
             this._log('Sending 3.3', true);
@@ -245,12 +245,12 @@ class VncClient extends Events {
             this._log('Sending 3.7', true);
             this.sendData(versionString.V3_007);
             this._version = '3.7';
-        } else if (this._socketBuffer.toString() === versionString.V3_008) {
+        } else if ([versionString.V3_008, versionString.V3_889].includes(this._socketBuffer.toString())) {
             this._log('Sending 3.8', true);
             this.sendData(versionString.V3_008);
             this._version = '3.8';
         } else {
-            // Negotiating auth mechanism
+            // Handshake: 7.1.2. Security Handshake
             this._handshaked = true;
             if (this._socketBuffer.includes(0x02) && this._password) {
                 this._log('Password provided and server support VNC auth. Choosing VNC auth.', true);
@@ -290,7 +290,7 @@ class VncClient extends Events {
      * @private
      */
     async _handleAuthChallenge() {
-
+        // Handshake: 7.1.3. SecurityResult Handshake
         if (this._challengeResponseSent) {
             // Challenge response already sent. Checking result.
 
@@ -319,8 +319,18 @@ class VncClient extends Events {
 
             this.reverseBits(key);
 
-            const des1 = crypto.createCipheriv('des', key, new Buffer(8));
-            const des2 = crypto.createCipheriv('des', key, new Buffer(8));
+            let des1
+            let des2
+            try {
+                des1 = crypto.createCipheriv('des', key, new Buffer(8));
+                des2 = crypto.createCipheriv('des', key, new Buffer(8));
+            } catch (err) {
+                this._log('Error creating DES cipher: ' + err.message, true);
+                this._log('You may need to set NODE_OPTIONS=--openssl-legacy-provider if you are using Node 17+');
+                this.emit('authError');
+                this.resetState();
+                return;                
+            }
 
             const response = new Buffer(16);
 

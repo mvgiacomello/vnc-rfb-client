@@ -20,7 +20,8 @@ const consts = {
     versionString: {
         V3_003: 'RFB 003.003\n',
         V3_007: 'RFB 003.007\n',
-        V3_008: 'RFB 003.008\n'
+        V3_008: 'RFB 003.008\n',
+        V3_889: 'RFB 003.889\n'
     },
     encodings: {
         raw: 0,
